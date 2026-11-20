@@ -1,0 +1,9 @@
+{
+    "name": "quickblock",
+    "displayName": "Quickblock",
+    "author": "pozix604",
+    "description": "Select blocks by keyboard. Press / to search.",
+    "version": "0.0.1",
+    "minGameVersion": "146",
+    "hidden": true
+}
