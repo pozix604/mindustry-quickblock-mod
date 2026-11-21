@@ -86,11 +86,12 @@ Events.run(Trigger.update, () => {
                 if (b.isVisible() && b.unlockedNow() && b.placeablePlayer && b.isPlaceable() && b.environmentBuildable()) {
                     matches.push({
                         block: b,
-                        name: name
+                        name: name,
+                        category: b.category.ordinal() // build-menu tab order
                     });
                 }
             }
-            matches.sort((x, y) => x.name.localeCompare(y.name)); // alphabetical
+            matches.sort((x, y) => (x.category - y.category) || x.name.localeCompare(y.name)); // by category, then alphabetical
 
             // Resource columns: every item needed by any match, in the game's item order
             var needed = {};
@@ -122,7 +123,7 @@ Events.run(Trigger.update, () => {
             var color = (r === sel) ? COLOR_SELECTED : COLOR_NORMAL;
             var blk = matches[r].block;
 
-            // columns: marker | icon | name | logic name | one column per resource
+            // columns: marker | icon | name | logic name | group | one column per resource
             var mark = new Label(r === sel ? ">" : " ");
             mark.setColor(color);
             listTable.add(mark).width(16);
@@ -140,6 +141,16 @@ Events.run(Trigger.update, () => {
             var logicLabel = new Label("@" + blk.name); // the name used in logic processors
             logicLabel.setColor(color);
             listTable.add(logicLabel).left().padRight(COLUMN_GAP);
+
+            var groupName;
+            try {
+                groupName = blk.category.localized(); // e.g. "Distribution"
+            } catch (e) {
+                groupName = blk.category.name();
+            }
+            var groupLabel = new Label(String(groupName));
+            groupLabel.setColor(color);
+            listTable.add(groupLabel).left().padRight(COLUMN_GAP);
 
             var amounts = {}; // this block's build cost, by item name
             for (var ri = 0; ri < blk.requirements.length; ri++) {
