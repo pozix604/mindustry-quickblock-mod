@@ -9,6 +9,8 @@ var MAX_ROWS = 20; // visible rows in the results list
 var FIELD_WIDTH = 320;
 var LIST_WIDTH = 360;
 var ICON_SIZE = 24;
+var COST_WIDTH = 96; // minimum width of each resource column
+var EMPTY_MARK = "\u00b7"; // shown where a block doesn't need a resource (\u00b7 = centered middle dot)
 var COLUMN_GAP = 32; // space between result columns (the gap after the icon is half of this)
 var HINT = "Type " + MIN_CHARS + " characters to match";
 
@@ -18,6 +20,7 @@ var query = "",
 var matches = [],
     sel = 0,
     winStart = 0; // result box state
+var costItems = []; // resource columns: every item any current match needs
 var dirty = false; // results need redrawing
 var closing = false; // dialog closing ...
 
@@ -32,7 +35,7 @@ Events.on(ClientLoadEvent, () => {
 
     dialog.cont.add(label).left().padBottom(6).row();
     dialog.cont.add(listTable).left().minWidth(LIST_WIDTH).padBottom(8).row();
-    dialog.cont.add(field).left().width(FIELD_WIDTH).height(40);
+    dialog.cont.add(field).center().width(FIELD_WIDTH).height(40);
 });
 
 Events.run(Trigger.update, () => {
@@ -52,6 +55,7 @@ Events.run(Trigger.update, () => {
             lastText = null;
             query = "";
             matches = [];
+            costItems = [];
             sel = winStart = 0;
             dirty = true;
             field.setText("");
@@ -70,6 +74,7 @@ Events.run(Trigger.update, () => {
         dirty = true;
         query = text.toLowerCase().split(" ").join(""); // spaces are ignored (in names too, below)
         matches = [];
+        costItems = [];
         if (query.length >= MIN_CHARS) {
             var blocks = Vars.content.blocks();
             for (var bi = 0; bi < blocks.size; bi++) {
@@ -86,6 +91,17 @@ Events.run(Trigger.update, () => {
                 }
             }
             matches.sort((x, y) => x.name.localeCompare(y.name)); // alphabetical
+
+            // Resource columns: every item needed by any match, in the game's item order
+            var needed = {};
+            for (var mi = 0; mi < matches.length; mi++) {
+                var reqs = matches[mi].block.requirements;
+                for (var qi = 0; qi < reqs.length; qi++) needed[String(reqs[qi].item.name)] = true;
+            }
+            var items = Vars.content.items();
+            for (var ii = 0; ii < items.size; ii++) {
+                if (needed[String(items.get(ii).name)]) costItems.push(items.get(ii));
+            }
         }
     }
 
@@ -106,7 +122,7 @@ Events.run(Trigger.update, () => {
             var color = (r === sel) ? COLOR_SELECTED : COLOR_NORMAL;
             var blk = matches[r].block;
 
-            // columns: marker | icon | name | logic name | build cost
+            // columns: marker | icon | name | logic name | one column per resource
             var mark = new Label(r === sel ? ">" : " ");
             mark.setColor(color);
             listTable.add(mark).width(16);
@@ -125,17 +141,27 @@ Events.run(Trigger.update, () => {
             logicLabel.setColor(color);
             listTable.add(logicLabel).left().padRight(COLUMN_GAP);
 
-            var cost = new Table(); // one [icon] amount pair per required resource
-            cost.left();
-            for (var ci = 0; ci < blk.requirements.length; ci++) {
-                try {
-                    cost.image(blk.requirements[ci].item.uiIcon).size(ICON_SIZE).padRight(2);
-                } catch (e) {} // icon is cosmetic
-                var amount = new Label(String(blk.requirements[ci].amount));
-                amount.setColor(color);
-                cost.add(amount).padRight(10);
+            var amounts = {}; // this block's build cost, by item name
+            for (var ri = 0; ri < blk.requirements.length; ri++) {
+                amounts[String(blk.requirements[ri].item.name)] = blk.requirements[ri].amount;
             }
-            listTable.add(cost).left().padBottom(2).row();
+            for (var ci = 0; ci < costItems.length; ci++) {
+                var cell = new Table(); // one fixed column per resource: [icon] amount, or [blank] EMPTY_MARK
+                cell.left();
+                var amount = amounts[String(costItems[ci].name)];
+                if (amount !== undefined) {
+                    try {
+                        cell.image(costItems[ci].uiIcon).size(ICON_SIZE).padRight(2);
+                    } catch (e) {} // icon is cosmetic
+                } else {
+                    cell.add(new Label("")).size(ICON_SIZE).padRight(2); // empty icon, so blank cells match filled ones
+                }
+                var amountLabel = new Label(amount !== undefined ? String(amount) : EMPTY_MARK);
+                amountLabel.setColor(color);
+                cell.add(amountLabel);
+                listTable.add(cell).left().minWidth(COST_WIDTH).padBottom(2);
+            }
+            listTable.row();
         }
         label.setText(query.length < MIN_CHARS ? HINT : (matches.length === 0 ? "No matches" : ""));
     }
