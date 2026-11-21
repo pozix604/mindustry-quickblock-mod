@@ -146,20 +146,20 @@ Events.run(Trigger.update, () => {
                 amounts[String(blk.requirements[ri].item.name)] = blk.requirements[ri].amount;
             }
             for (var ci = 0; ci < costItems.length; ci++) {
-                var cell = new Table(); // one fixed column per resource: [icon] amount, or [blank] EMPTY_MARK
-                cell.left();
+                var cell = new Table(); // one fixed column per resource: amount [icon], or EMPTY_MARK [blank]
+                cell.right();
                 var amount = amounts[String(costItems[ci].name)];
-                if (amount !== undefined) {
-                    try {
-                        cell.image(costItems[ci].uiIcon).size(ICON_SIZE).padRight(2);
-                    } catch (e) {} // icon is cosmetic
-                } else {
-                    cell.add(new Label("")).size(ICON_SIZE).padRight(2); // empty icon, so blank cells match filled ones
-                }
                 var amountLabel = new Label(amount !== undefined ? String(amount) : EMPTY_MARK);
                 amountLabel.setColor(color);
-                cell.add(amountLabel);
-                listTable.add(cell).left().minWidth(COST_WIDTH).padBottom(2);
+                cell.add(amountLabel).padRight(2);
+                if (amount !== undefined) {
+                    try {
+                        cell.image(costItems[ci].uiIcon).size(ICON_SIZE);
+                    } catch (e) {} // icon is cosmetic
+                } else {
+                    cell.add(new Label("")).size(ICON_SIZE); // empty icon, so blank cells match filled ones
+                }
+                listTable.add(cell).right().minWidth(COST_WIDTH).padBottom(2);
             }
             listTable.row();
         }
