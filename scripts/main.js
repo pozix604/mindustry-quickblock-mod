@@ -5,10 +5,11 @@ var COLOR_NORMAL = Packages.arc.graphics.Color.white;
 var TITLE = "Block Search";
 var OPEN_KEY = Keys.slash;
 var MIN_CHARS = 3; // characters needed before matching starts
-var MAX_ROWS = 15; // visible rows in the results list
+var MAX_ROWS = 20; // visible rows in the results list
 var FIELD_WIDTH = 320;
 var LIST_WIDTH = 360;
 var ICON_SIZE = 24;
+var COLUMN_GAP = 32; // space between result columns (the gap after the icon is half of this)
 var HINT = "Type " + MIN_CHARS + " characters to match";
 
 var dialog, field, label, listTable;
@@ -76,26 +77,13 @@ Events.run(Trigger.update, () => {
                 var name = String(b.localizedName);
                 if (name.toLowerCase().split(" ").join("").indexOf(query) < 0) continue;
 
-                var ok = true; // Filter on available blocks
-                try {
-                    ok = ok && b.isVisible();
-                } catch (e) {}
-                try {
-                    ok = ok && b.unlockedNow();
-                } catch (e) {}
-                try {
-                    ok = ok && b.placeablePlayer;
-                } catch (e) {}
-                try {
-                    ok = ok && b.isPlaceable();
-                } catch (e) {}
-                try {
-                    ok = ok && b.environmentBuildable();
-                } catch (e) {}
-                if (ok) matches.push({
-                    block: b,
-                    name: name
-                });
+                // Filter on available blocks
+                if (b.isVisible() && b.unlockedNow() && b.placeablePlayer && b.isPlaceable() && b.environmentBuildable()) {
+                    matches.push({
+                        block: b,
+                        name: name
+                    });
+                }
             }
             matches.sort((x, y) => x.name.localeCompare(y.name)); // alphabetical
         }
@@ -116,22 +104,38 @@ Events.run(Trigger.update, () => {
         listTable.clear();
         for (var r = winStart; r < Math.min(matches.length, winStart + MAX_ROWS); r++) {
             var color = (r === sel) ? COLOR_SELECTED : COLOR_NORMAL;
-            var row = new Table();
-            row.left();
+            var blk = matches[r].block;
 
+            // columns: marker | icon | name | logic name | build cost
             var mark = new Label(r === sel ? ">" : " ");
             mark.setColor(color);
-            row.add(mark).width(16);
+            listTable.add(mark).width(16);
 
             try {
-                row.image(matches[r].block.uiIcon).size(ICON_SIZE).padRight(8);
-            } catch (e) {} // icon is cosmetic
+                listTable.image(blk.uiIcon).size(ICON_SIZE).padRight(COLUMN_GAP / 2);
+            } catch (e) {
+                listTable.add(new Label("")); // keep the columns aligned if the icon is unavailable
+            }
 
             var nameLabel = new Label(matches[r].name);
             nameLabel.setColor(color);
-            row.add(nameLabel).left();
+            listTable.add(nameLabel).left().padRight(COLUMN_GAP);
 
-            listTable.add(row).left().padBottom(2).row();
+            var logicLabel = new Label("@" + blk.name); // the name used in logic processors
+            logicLabel.setColor(color);
+            listTable.add(logicLabel).left().padRight(COLUMN_GAP);
+
+            var cost = new Table(); // one [icon] amount pair per required resource
+            cost.left();
+            for (var ci = 0; ci < blk.requirements.length; ci++) {
+                try {
+                    cost.image(blk.requirements[ci].item.uiIcon).size(ICON_SIZE).padRight(2);
+                } catch (e) {} // icon is cosmetic
+                var amount = new Label(String(blk.requirements[ci].amount));
+                amount.setColor(color);
+                cost.add(amount).padRight(10);
+            }
+            listTable.add(cost).left().padBottom(2).row();
         }
         label.setText(query.length < MIN_CHARS ? HINT : (matches.length === 0 ? "No matches" : ""));
     }
